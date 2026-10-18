@@ -1,0 +1,9 @@
+[ProcessMonitoringAgent] Initialized - monitoring 5 machines.
+[GraniteClient] Connected to IBM Granite model successfully.
+[QualityAnalysisAgent] Initialized with IBM Granite backend.
+[DefectPredictionAgent] Initialized defect prediction engine.
+[ProcessOptimizationAgent] Initialized process optimization engine.
+[RAGRetriever] Loaded 10 knowledge documents.
+[Server] Background monitoring loop started.
+ * Serving Flask app 'server'
+ * Debug mode: off

@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Manufacturing Quality Control — IBM Granite AI</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #388bfd;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --orange: #f0883e;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --cyan: #39d353;
+    --font: -apple-system, "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; min-height: 100vh; }
+
+  /* ── Header ── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .logo { font-size: 18px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+  .logo span { color: var(--accent); }
+  .ibm-badge {
+    background: var(--accent); color: #fff; font-size: 10px; font-weight: 700;
+    padding: 2px 7px; border-radius: 3px; letter-spacing: 0.5px;
+  }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  #live-indicator { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+  #system-time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  /* ── Layout ── */
+  .container { max-width: 1600px; margin: 0 auto; padding: 20px 24px; }
+
+  /* ── KPI Cards ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .kpi-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; cursor: default; transition: border-color .2s;
+  }
+  .kpi-card:hover { border-color: var(--accent); }
+  .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+  .kpi-value { font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+  .kpi-sub { font-size: 11px; color: var(--muted); }
+  .kpi-trend { font-size: 12px; margin-top: 6px; }
+
+  /* ── Grid layout ── */
+  .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .full-width { grid-column: 1 / -1; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 900px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .three-col { grid-template-columns: 1fr; }
+  }
+
+  /* ── Panels ── */
+  .panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  }
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .panel-title { font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .panel-body { padding: 16px; }
+
+  /* ── Agent badges ── */
+  .agent-badge {
+    font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+    letter-spacing: 0.4px;
+  }
+  .badge-monitor { background: rgba(56,139,253,.2); color: var(--accent); }
+  .badge-analysis { background: rgba(188,140,255,.2); color: var(--purple); }
+  .badge-predict { background: rgba(240,136,62,.2); color: var(--orange); }
+  .badge-optimize { background: rgba(63,185,80,.2); color: var(--green); }
+
+  /* ── Risk level indicator ── */
+  .risk-indicator {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 20px;
+  }
+  .risk-LOW { background: rgba(63,185,80,.15); color: var(--green); }
+  .risk-MEDIUM { background: rgba(210,153,34,.15); color: var(--yellow); }
+  .risk-HIGH { background: rgba(240,136,62,.15); color: var(--orange); }
+  .risk-CRITICAL { background: rgba(248,81,73,.2); color: var(--red); }
+
+  /* ── Parameter table ── */
+  .param-table { width: 100%; border-collapse: collapse; }
+  .param-table th { font-size: 10px; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+  .param-table td { padding: 8px 8px; border-bottom: 1px solid rgba(48,54,61,.5); font-variant-numeric: tabular-nums; font-size: 13px; }
+  .param-table tr:last-child td { border-bottom: none; }
+  .status-ok { color: var(--green); font-weight: 600; }
+  .status-warn { color: var(--red); font-weight: 700; }
+  .spec-bar-wrap { width: 80px; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; display: inline-block; vertical-align: middle; }
+  .spec-bar { height: 100%; border-radius: 3px; transition: width .4s; }
+
+  /* ── Defect score bars ── */
+  .defect-row { margin-bottom: 10px; }
+  .defect-label { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12px; }
+  .defect-bar-bg { background: var(--surface2); border-radius: 4px; height: 8px; overflow: hidden; }
+  .defect-bar-fill { height: 100%; border-radius: 4px; transition: width .6s; }
+
+  /* ── Alert list ── */
+  .alert-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px; border-radius: 8px; margin-bottom: 8px;
+    border-left: 3px solid;
+  }
+  .alert-critical { background: rgba(248,81,73,.08); border-color: var(--red); }
+  .alert-high { background: rgba(240,136,62,.08); border-color: var(--orange); }
+  .alert-medium { background: rgba(210,153,34,.08); border-color: var(--yellow); }
+  .alert-low { background: rgba(63,185,80,.08); border-color: var(--green); }
+  .alert-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .alert-body { flex: 1; }
+  .alert-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .alert-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .alert-time { font-size: 10px; color: var(--muted); white-space: nowrap; }
+
+  /* ── Narrative panel ── */
+  .narrative-box {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px; font-size: 13px; line-height: 1.7; color: #cdd5e0;
+    min-height: 80px; white-space: pre-wrap;
+  }
+  .narrative-loading { color: var(--muted); font-style: italic; }
+
+  /* ── Action items ── */
+  .action-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px; border-radius: 8px; margin-bottom: 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+  }
+  .action-urgency {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.5px; padding: 2px 6px;
+    border-radius: 3px; flex-shrink: 0; margin-top: 2px;
+  }
+  .urgency-IMMEDIATE { background: rgba(248,81,73,.2); color: var(--red); }
+  .urgency-SOON { background: rgba(210,153,34,.2); color: var(--yellow); }
+  .action-text { font-size: 12px; line-height: 1.55; color: var(--text); }
+  .action-param { font-weight: 700; color: var(--accent); }
+
+  /* ── Machine status ── */
+  .machine-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+  .machine-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px; text-align: center;
+  }
+  .machine-icon { font-size: 24px; margin-bottom: 6px; }
+  .machine-name { font-size: 11px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .machine-status { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+  .mstatus-RUNNING { background: rgba(63,185,80,.15); color: var(--green); }
+  .mstatus-WARNING { background: rgba(248,81,73,.15); color: var(--red); }
+  .mstatus-IDLE { background: rgba(139,148,158,.15); color: var(--muted); }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; gap: 4px; padding: 8px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); }
+  .tab-btn {
+    padding: 6px 14px; border-radius: 6px; border: none; background: transparent;
+    color: var(--muted); font-size: 12px; font-family: var(--font); cursor: pointer; font-weight: 500;
+    transition: all .2s;
+  }
+  .tab-btn.active { background: var(--accent); color: #fff; }
+  .tab-btn:hover:not(.active) { background: var(--surface); color: var(--text); }
+  .tab-content { padding: 16px; display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── Chart ── */
+  .chart-wrap { position: relative; height: 220px; }
+
+  /* ── RAG docs ── */
+  .doc-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 10px; font-size: 11px; margin: 4px;
+  }
+  .doc-chip-id { color: var(--accent); font-weight: 700; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  /* ── Toast ── */
+  #toast-container { position: fixed; top: 70px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 16px; font-size: 12px; min-width: 260px; max-width: 360px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.5); animation: slideIn .3s ease;
+    display: flex; align-items: center; gap: 10px;
+  }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  .toast-critical { border-left: 3px solid var(--red); }
+  .toast-warning { border-left: 3px solid var(--orange); }
+  .toast-ok { border-left: 3px solid var(--green); }
+
+  /* ── Footer ── */
+  footer { text-align: center; padding: 20px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════ HEADER ══════════════════════════════════ -->
+<header>
+  <div class="header-left">
+    <div class="logo">Mfg<span>QC</span> Dashboard</div>
+    <span class="ibm-badge">IBM GRANITE</span>
+    <span style="font-size:11px;color:var(--muted)">AI-Powered Manufacturing Quality Control</span>
+  </div>
+  <div class="header-right">
+    <div id="live-indicator"><div class="pulse"></div><span id="connection-status">Connecting…</span></div>
+    <div id="system-time">--:--:--</div>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════ TOASTS ══════════════════════════════════ -->
+<div id="toast-container"></div>
+
+<!-- ══════════════════════════════════ MAIN ══════════════════════════════════ -->
+<div class="container">
+
+  <!-- KPI Row -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Risk Level</div>
+      <div class="kpi-value" id="kpi-risk" style="font-size:20px">—</div>
+      <div class="kpi-sub" id="kpi-risk-sub">Awaiting data</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Severity Score</div>
+      <div class="kpi-value" id="kpi-severity">—</div>
+      <div class="kpi-sub">0 = perfect, 1 = critical</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Out-of-Spec</div>
+      <div class="kpi-value" id="kpi-oos">—</div>
+      <div class="kpi-sub">parameters this reading</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Defect Risk</div>
+      <div class="kpi-value" id="kpi-defect-risk">—</div>
+      <div class="kpi-sub" id="kpi-defect-name">Checking…</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Production Rate</div>
+      <div class="kpi-value" id="kpi-prod-rate">—</div>
+      <div class="kpi-sub">units / hour</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Active Machine</div>
+      <div class="kpi-value" style="font-size:18px" id="kpi-machine">—</div>
+      <div class="kpi-sub" id="kpi-batch">Batch —</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Optimization</div>
+      <div class="kpi-value" style="font-size:18px" id="kpi-opt-priority">—</div>
+      <div class="kpi-sub">action priority</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Reading #</div>
+      <div class="kpi-value" id="kpi-tick">—</div>
+      <div class="kpi-sub">data points collected</div>
+    </div>
+  </div>
+
+  <!-- Row 1: Parameters + Alerts -->
+  <div class="main-grid">
+    <!-- Parameters Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span>⚙️</span> Live Sensor Parameters
+          <span class="agent-badge badge-monitor">Monitor Agent</span>
+        </div>
+        <span id="reading-timestamp" style="font-size:11px;color:var(--muted)">—</span>
+      </div>
+      <div class="panel-body" style="padding:0">
+        <table class="param-table">
+          <thead>
+            <tr><th>Parameter</th><th>Value</th><th>Spec Range</th><th>Status</th><th>Bar</th></tr>
+          </thead>
+          <tbody id="param-tbody">
+            <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Alerts Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span>🚨</span> Active Alerts & Anomalies
+          <span class="agent-badge badge-analysis">Analysis Agent</span>
+        </div>
+        <span id="anomaly-count" style="font-size:11px;color:var(--muted)">—</span>
+      </div>
+      <div class="panel-body" id="alerts-body" style="max-height:320px;overflow-y:auto">
+        <div style="color:var(--muted);text-align:center;padding:20px">Loading anomaly data…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2: Charts -->
+  <div class="main-grid">
+    <!-- Parameter Trend Chart -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span>📈</span> Parameter Trends (Last 30 Readings)</div>
+        <select id="chart-param-select" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 8px;font-size:11px">
+          <option value="temperature">Temperature</option>
+          <option value="pressure">Pressure</option>
+          <option value="vibration">Vibration</option>
+          <option value="speed">Speed</option>
+          <option value="torque">Torque</option>
+          <option value="surface_roughness">Surface Roughness</option>
+          <option value="thickness">Thickness</option>
+        </select>
+      </div>
+      <div class="panel-body"><div class="chart-wrap"><canvas id="trend-chart"></canvas></div></div>
+    </div>
+
+    <!-- Risk History Chart -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span>📊</span> Quality Severity & Defect Risk History</div>
+      </div>
+      <div class="panel-body"><div class="chart-wrap"><canvas id="risk-chart"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- Row 3: Defect Predictions + Optimization -->
+  <div class="three-col">
+    <!-- Defect Prediction -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span>🔮</span> Defect Predictions
+          <span class="agent-badge badge-predict">Predict Agent</span>
+        </div>
+      </div>
+      <div class="panel-body" id="defect-scores-body">
+        <div style="color:var(--muted)">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Optimization Actions -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span>🔧</span> Corrective Actions
+          <span class="agent-badge badge-optimize">Optimize Agent</span>
+        </div>
+      </div>
+      <div class="panel-body" id="actions-body" style="max-height:300px;overflow-y:auto">
+        <div style="color:var(--muted)">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Machine Status -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span>🏭</span> Machine Status</div>
+      </div>
+      <div class="panel-body">
+        <div class="machine-grid" id="machine-grid">
+          <div style="color:var(--muted)">Loading…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 4: AI Narratives (tabbed) -->
+  <div class="panel full-width" style="margin-bottom:16px">
+    <div class="panel-header">
+      <div class="panel-title"><span>🤖</span> IBM Granite AI Insights</div>
+      <span class="ibm-badge">Granite-3-8B-Instruct</span>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('tab-analysis')">Quality Analysis</button>
+      <button class="tab-btn" onclick="switchTab('tab-prediction')">Defect Prediction</button>
+      <button class="tab-btn" onclick="switchTab('tab-optimization')">Optimization</button>
+      <button class="tab-btn" onclick="switchTab('tab-rag')">RAG Report</button>
+    </div>
+    <div id="tab-analysis" class="tab-content active">
+      <div class="narrative-box" id="narrative-analysis">Awaiting IBM Granite analysis…</div>
+    </div>
+    <div id="tab-prediction" class="tab-content">
+      <div class="narrative-box" id="narrative-prediction">Awaiting IBM Granite prediction…</div>
+    </div>
+    <div id="tab-optimization" class="tab-content">
+      <div class="narrative-box" id="narrative-optimization">Awaiting IBM Granite optimization…</div>
+    </div>
+    <div id="tab-rag" class="tab-content">
+      <div style="margin-bottom:12px">
+        <button onclick="loadRAGReport()" style="background:var(--accent);color:#fff;border:none;padding:7px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-family:var(--font)">
+          🔍 Generate RAG Report
+        </button>
+        <span style="font-size:11px;color:var(--muted);margin-left:10px">Retrieves relevant knowledge documents and queries IBM Granite</span>
+      </div>
+      <div class="narrative-box" id="narrative-rag">Click "Generate RAG Report" to retrieve manufacturing knowledge and generate a report.</div>
+      <div id="rag-sources" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <!-- Row 5: Maintenance Schedule + Process Forecast -->
+  <div class="main-grid">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span>🗓️</span> Maintenance Schedule</div>
+      </div>
+      <div class="panel-body" id="maintenance-body">
+        <div style="color:var(--muted)">Loading…</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span>📡</span> Process Forecast</div>
+      </div>
+      <div class="panel-body" id="forecast-body">
+        <div style="color:var(--muted)">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<footer>
+  IBM Granite AI · Manufacturing Quality Control System · Real-time Multi-Agent Dashboard
+  <br>Powered by IBM Watsonx AI · Project ID: 3cb648e7-2430-4e25-86ab-bc51d756ef68
+</footer>
+
+<!-- ═══════════════════════════════════════════ JAVASCRIPT ═══════════════════════════════════════════ -->
+<script>
+// ── Config ──────────────────────────────────────────────────────────────────
+const API = '';  // same origin
+const REFRESH_MS = 5000;
+const CHART_MAX_POINTS = 30;
+
+const SPECS = {
+  temperature:      { min: 180, max: 220, unit: '°C' },
+  pressure:         { min: 95,  max: 105, unit: 'bar' },
+  vibration:        { min: 0,   max: 2.5, unit: 'mm/s' },
+  humidity:         { min: 30,  max: 60,  unit: '%' },
+  speed:            { min: 950, max: 1050,unit: 'RPM' },
+  torque:           { min: 45,  max: 75,  unit: 'Nm' },
+  thickness:        { min: 9.8, max: 10.2,unit: 'mm' },
+  surface_roughness:{ min: 0,   max: 1.6, unit: 'μm' },
+};
+
+const RISK_COLORS = { LOW: '#3fb950', MEDIUM: '#d29922', HIGH: '#f0883e', CRITICAL: '#f85149' };
+const DEFECT_COLORS = ['#388bfd','#bc8cff','#f0883e','#3fb950','#39d353'];
+
+let trendChart = null, riskChart = null;
+let lastTick = -1;
+let toastCooldown = {};
+
+// ── Clock ────────────────────────────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('system-time').textContent = new Date().toLocaleTimeString();
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(id) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ── Toast notifications ───────────────────────────────────────────────────────
+function showToast(message, type = 'warning') {
+  if (toastCooldown[type]) return;
+  toastCooldown[type] = true;
+  setTimeout(() => { toastCooldown[type] = false; }, 15000);
+
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  const icons = { critical: '🚨', warning: '⚠️', ok: '✅' };
+  el.innerHTML = `<span>${icons[type] || '⚠️'}</span><span>${message}</span>`;
+  container.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .5s'; setTimeout(() => el.remove(), 500); }, 6000);
+}
+
+// ── Charts init ───────────────────────────────────────────────────────────────
+function initCharts() {
+  const chartDefaults = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#8b949e', font: { size: 11 } } } },
+    scales: {
+      x: { ticks: { color: '#8b949e', maxTicksLimit: 8, font: { size: 10 } }, grid: { color: '#21262d' } },
+      y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
+    }
+  };
+
+  trendChart = new Chart(document.getElementById('trend-chart'), {
+    type: 'line',
+    data: { labels: [], datasets: [{
+      label: 'Temperature (°C)', data: [], borderColor: '#388bfd',
+      backgroundColor: 'rgba(56,139,253,.1)', fill: true, tension: 0.4, pointRadius: 2,
+    }, {
+      label: 'Min Spec', data: [], borderColor: '#3fb950', borderDash: [4,4],
+      borderWidth: 1, pointRadius: 0, fill: false,
+    }, {
+      label: 'Max Spec', data: [], borderColor: '#f85149', borderDash: [4,4],
+      borderWidth: 1, pointRadius: 0, fill: false,
+    }]},
+    options: { ...chartDefaults, interaction: { mode: 'index', intersect: false } }
+  });
+
+  riskChart = new Chart(document.getElementById('risk-chart'), {
+    type: 'line',
+    data: { labels: [], datasets: [{
+      label: 'Quality Severity', data: [], borderColor: '#bc8cff',
+      backgroundColor: 'rgba(188,140,255,.1)', fill: true, tension: 0.4, pointRadius: 2, yAxisID: 'y',
+    }, {
+      label: 'Defect Risk', data: [], borderColor: '#f0883e',
+      backgroundColor: 'rgba(240,136,62,.08)', fill: true, tension: 0.4, pointRadius: 2, yAxisID: 'y',
+    }, {
+      label: 'Out-of-Spec Count', data: [], borderColor: '#f85149',
+      backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, yAxisID: 'y1', borderDash: [3,3],
+    }]},
+    options: {
+      ...chartDefaults,
+      scales: {
+        x: chartDefaults.scales.x,
+        y: { ...chartDefaults.scales.y, min: 0, max: 1, title: { display: true, text: 'Score', color: '#8b949e', font: { size: 10 } } },
+        y1: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { drawOnChartArea: false }, position: 'right', min: 0 },
+      }
+    }
+  });
+}
+
+// ── Update trend chart ────────────────────────────────────────────────────────
+function updateTrendChart(history) {
+  const param = document.getElementById('chart-param-select').value;
+  const spec = SPECS[param] || {};
+  const labels = history.map(h => '#' + h.tick);
+  const values = history.map(h => h[param]);
+  const mins   = history.map(() => spec.min);
+  const maxs   = history.map(() => spec.max);
+
+  trendChart.data.labels = labels;
+  trendChart.data.datasets[0].data = values;
+  trendChart.data.datasets[0].label = param.replace('_',' ') + ' (' + (spec.unit||'') + ')';
+  trendChart.data.datasets[1].data = mins;
+  trendChart.data.datasets[2].data = maxs;
+  trendChart.update('none');
+}
+
+document.getElementById('chart-param-select').addEventListener('change', () => {
+  if (window._lastHistory) updateTrendChart(window._lastHistory);
+});
+
+// ── Update risk/severity chart ────────────────────────────────────────────────
+function updateRiskChart(analysisHistory, predictionHistory, sensorHistory) {
+  const labels = sensorHistory.map(h => '#' + h.tick);
+  const severity = analysisHistory.map(h => h.severity || 0);
+  const risk     = predictionHistory.map(h => h.overall_risk || 0);
+  const oos      = sensorHistory.map(h => h.out_of_spec_count || 0);
+
+  const maxLen = Math.min(labels.length, severity.length, risk.length, oos.length);
+  riskChart.data.labels           = labels.slice(-maxLen);
+  riskChart.data.datasets[0].data = severity.slice(-maxLen);
+  riskChart.data.datasets[1].data = risk.slice(-maxLen);
+  riskChart.data.datasets[2].data = oos.slice(-maxLen);
+  riskChart.update('none');
+}
+
+// ── Render parameters table ───────────────────────────────────────────────────
+function renderParamTable(reading) {
+  const params = reading.parameters || {};
+  const oos = reading.out_of_spec || [];
+  const tbody = document.getElementById('param-tbody');
+  tbody.innerHTML = '';
+  for (const [key, val] of Object.entries(params)) {
+    const spec = SPECS[key] || {};
+    const isWarn = oos.includes(key);
+    const mid = (spec.min + spec.max) / 2;
+    const range = spec.max - spec.min;
+    const pct = range > 0 ? Math.min(100, Math.max(0, ((val - spec.min) / range) * 100)) : 50;
+    const barColor = isWarn ? 'var(--red)' : 'var(--green)';
+    const label = key.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+    tbody.innerHTML += `<tr>
+      <td>${label}</td>
+      <td style="font-weight:600;color:${isWarn?'var(--red)':'var(--text)'}">${val} <span style="color:var(--muted);font-size:11px">${spec.unit||''}</span></td>
+      <td style="color:var(--muted);font-size:11px">${spec.min}–${spec.max} ${spec.unit||''}</td>
+      <td class="${isWarn?'status-warn':'status-ok'}">${isWarn?'⚠ WARN':'✓ OK'}</td>
+      <td><div class="spec-bar-wrap"><div class="spec-bar" style="width:${pct}%;background:${barColor}"></div></div></td>
+    </tr>`;
+  }
+}
+
+// ── Render alerts ─────────────────────────────────────────────────────────────
+function renderAlerts(analysis) {
+  const anomalies = analysis.anomalies || [];
+  const body = document.getElementById('alerts-body');
+  document.getElementById('anomaly-count').textContent = anomalies.length + ' anomalies';
+  if (anomalies.length === 0) {
+    body.innerHTML = '<div class="alert-item alert-low"><div class="alert-icon">✅</div><div class="alert-body"><div class="alert-title">All Parameters Normal</div><div class="alert-desc">No anomalies detected. Process operating within specification.</div></div></div>';
+    return;
+  }
+  body.innerHTML = anomalies.map(a => {
+    const rl = analysis.risk_level || 'LOW';
+    const cls = rl === 'CRITICAL' ? 'alert-critical' : rl === 'HIGH' ? 'alert-high' : rl === 'MEDIUM' ? 'alert-medium' : 'alert-low';
+    const icon = rl === 'CRITICAL' ? '🚨' : rl === 'HIGH' ? '⚠️' : '⚡';
+    const param = (a.parameter||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+    const detail = a.detection_method === 'threshold'
+      ? `${a.direction} — value ${a.value} ${a.unit||''} (spec: ${a.expected_min}–${a.expected_max})`
+      : `Statistical anomaly — Z-score: ${a.z_score} (mean: ${a.mean}, σ: ${a.std})`;
+    return `<div class="alert-item ${cls}">
+      <div class="alert-icon">${icon}</div>
+      <div class="alert-body">
+        <div class="alert-title">${param} Out of Range</div>
+        <div class="alert-desc">${detail}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Render defect scores ──────────────────────────────────────────────────────
+function renderDefectScores(prediction) {
+  const scores = prediction.defect_scores || {};
+  const body = document.getElementById('defect-scores-body');
+  const entries = Object.entries(scores).sort((a,b) => b[1]-a[1]);
+  body.innerHTML = entries.map(([name, score], i) => {
+    const pct = Math.round(score * 100);
+    const color = score > 0.6 ? 'var(--red)' : score > 0.35 ? 'var(--orange)' : score > 0.15 ? 'var(--yellow)' : 'var(--green)';
+    return `<div class="defect-row">
+      <div class="defect-label">
+        <span>${name}</span>
+        <span style="font-weight:700;color:${color}">${pct}%</span>
+      </div>
+      <div class="defect-bar-bg">
+        <div class="defect-bar-fill" style="width:${pct}%;background:${color}"></div>
+      </div>
+    </div>`;
+  }).join('');
+  if (!entries.length) body.innerHTML = '<div style="color:var(--muted)">No defect data</div>';
+}
+
+// ── Render corrective actions ─────────────────────────────────────────────────
+function renderActions(optimization) {
+  const actions = optimization.immediate_actions || [];
+  const body = document.getElementById('actions-body');
+  if (actions.length === 0) {
+    body.innerHTML = '<div class="action-item"><span>✅</span><div class="action-text">No corrective actions required. Process is within specification.</div></div>';
+    return;
+  }
+  body.innerHTML = actions.map(a => {
+    const param = (a.parameter||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+    return `<div class="action-item">
+      <span class="action-urgency urgency-${a.urgency}">${a.urgency}</span>
+      <div class="action-text">
+        <span class="action-param">${param}:</span> ${a.action}
+        <br><span style="color:var(--muted);font-size:11px">Target: ${a.target_range}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Render maintenance ────────────────────────────────────────────────────────
+function renderMaintenance(optimization) {
+  const items = optimization.preventive_maintenance || [];
+  const body = document.getElementById('maintenance-body');
+  body.innerHTML = items.map(item =>
+    `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;line-height:1.55">${item}</div>`
+  ).join('') || '<div style="color:var(--muted)">No maintenance items</div>';
+}
+
+// ── Render forecast ───────────────────────────────────────────────────────────
+function renderForecast(prediction) {
+  const f = prediction.forecast || {};
+  const dir = f.direction || 'stable';
+  const conf = Math.round((f.confidence||0.5)*100);
+  const icons = { deteriorating: '📉', improving: '📈', stable: '📊' };
+  const colors = { deteriorating: 'var(--red)', improving: 'var(--green)', stable: 'var(--accent)' };
+  document.getElementById('forecast-body').innerHTML = `
+    <div style="text-align:center;padding:16px">
+      <div style="font-size:48px;margin-bottom:10px">${icons[dir]||'📊'}</div>
+      <div style="font-size:20px;font-weight:700;color:${colors[dir]||'var(--accent)'};text-transform:capitalize;margin-bottom:6px">${dir}</div>
+      <div style="font-size:13px;color:var(--muted)">Confidence: <strong style="color:var(--text)">${conf}%</strong></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">Horizon: ${f.horizon||'next 5 readings'}</div>
+      <div style="margin-top:16px;padding:10px;background:var(--surface2);border-radius:8px;font-size:12px">
+        Top defect: <strong style="color:var(--orange)">${prediction.top_defect||'None'}</strong>
+        <span style="color:var(--muted)"> — ${Math.round((prediction.top_defect_probability||0)*100)}% probability</span>
+      </div>
+    </div>`;
+}
+
+// ── Render machine status ─────────────────────────────────────────────────────
+async function refreshMachines() {
+  try {
+    const res = await fetch(API + '/api/machines');
+    const data = await res.json();
+    const grid = document.getElementById('machine-grid');
+    const icons = { 'CNC-01': '⚙️', 'CNC-02': '⚙️', 'PRESS-01': '🔩', 'LATHE-01': '🔄', 'GRINDER-01': '⚡' };
+    grid.innerHTML = Object.entries(data).map(([m, s]) => `
+      <div class="machine-card">
+        <div class="machine-icon">${icons[m]||'🏭'}</div>
+        <div class="machine-name">${m}</div>
+        <div class="machine-status mstatus-${s}">${s}</div>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+// ── KPI update ────────────────────────────────────────────────────────────────
+function updateKPIs(status) {
+  const rl = status.risk_level || 'LOW';
+  const riskEl = document.getElementById('kpi-risk');
+  riskEl.textContent = rl;
+  riskEl.style.color = RISK_COLORS[rl] || 'var(--text)';
+  document.getElementById('kpi-risk-sub').textContent = `Severity: ${((status.severity||0)*100).toFixed(1)}%`;
+  document.getElementById('kpi-severity').textContent = ((status.severity||0)).toFixed(3);
+  document.getElementById('kpi-severity').style.color = RISK_COLORS[rl]||'var(--text)';
+  document.getElementById('kpi-oos').textContent = status.out_of_spec_count || 0;
+  document.getElementById('kpi-oos').style.color = (status.out_of_spec_count||0) > 0 ? 'var(--red)' : 'var(--green)';
+  document.getElementById('kpi-defect-risk').textContent = ((status.overall_risk||0)*100).toFixed(1) + '%';
+  document.getElementById('kpi-defect-name').textContent = status.top_defect || 'None';
+  document.getElementById('kpi-prod-rate').textContent = (status.production_rate||0).toFixed(1);
+  document.getElementById('kpi-machine').textContent = status.machine_id || '—';
+  document.getElementById('kpi-batch').textContent = 'Batch ' + (status.batch_id||'—');
+  document.getElementById('kpi-opt-priority').textContent = status.optimization_priority || '—';
+  document.getElementById('kpi-opt-priority').style.color = RISK_COLORS[status.optimization_priority]||'var(--text)';
+  document.getElementById('kpi-tick').textContent = '#' + (status.tick||0);
+
+  // Toasts for critical events
+  if (rl === 'CRITICAL') showToast('CRITICAL quality risk detected on ' + status.machine_id, 'critical');
+  else if (rl === 'HIGH') showToast('HIGH risk alert — ' + (status.top_defect||'unknown defect') + ' predicted', 'warning');
+}
+
+// ── RAG Report ────────────────────────────────────────────────────────────────
+async function loadRAGReport() {
+  const el = document.getElementById('narrative-rag');
+  const srcEl = document.getElementById('rag-sources');
+  el.textContent = '⏳ Querying IBM Granite with retrieved knowledge…';
+  srcEl.innerHTML = '';
+  try {
+    const res = await fetch(API + '/api/rag/report');
+    const data = await res.json();
+    el.textContent = data.report || 'No report generated.';
+    if (data.source_documents && data.source_documents.length) {
+      srcEl.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Source documents retrieved:</div>' +
+        data.source_documents.map(d =>
+          `<span class="doc-chip"><span class="doc-chip-id">${d.id}</span><span>${d.title}</span></span>`
+        ).join('');
+    }
+  } catch(e) {
+    el.textContent = 'Error generating RAG report: ' + e.message;
+  }
+}
+
+// ── Main refresh loop ─────────────────────────────────────────────────────────
+async function refresh() {
+  try {
+    const [statusRes, analysisRes, predictionRes, optRes, histRes, aHistRes, pHistRes] = await Promise.all([
+      fetch(API + '/api/status'),
+      fetch(API + '/api/analysis'),
+      fetch(API + '/api/prediction'),
+      fetch(API + '/api/optimization'),
+      fetch(API + '/api/history'),
+      fetch(API + '/api/analysis/history'),
+      fetch(API + '/api/prediction/history'),
+    ]);
+
+    const status     = await statusRes.json();
+    const analysis   = await analysisRes.json();
+    const prediction = await predictionRes.json();
+    const opt        = await optRes.json();
+    const history    = await histRes.json();
+    const aHistory   = await aHistRes.json();
+    const pHistory   = await pHistRes.json();
+
+    if (status.status === 'initializing') {
+      document.getElementById('connection-status').textContent = 'Initializing…';
+      return;
+    }
+
+    document.getElementById('connection-status').textContent = 'Live';
+
+    // Skip full render if same tick
+    if (status.tick === lastTick) return;
+    lastTick = status.tick;
+
+    // Reading
+    const readingRes = await fetch(API + '/api/reading');
+    const reading = await readingRes.json();
+
+    document.getElementById('reading-timestamp').textContent = new Date(reading.timestamp||'').toLocaleTimeString();
+
+    updateKPIs(status);
+    renderParamTable(reading);
+    renderAlerts(analysis);
+    renderDefectScores(prediction);
+    renderActions(opt);
+    renderMaintenance(opt);
+    renderForecast(prediction);
+
+    // Charts
+    window._lastHistory = history;
+    updateTrendChart(history);
+    updateRiskChart(aHistory, pHistory, history);
+
+    // Narratives
+    if (analysis.narrative) document.getElementById('narrative-analysis').textContent = analysis.narrative;
+    if (prediction.narrative) document.getElementById('narrative-prediction').textContent = prediction.narrative;
+    if (opt.narrative) document.getElementById('narrative-optimization').textContent = opt.narrative;
+
+    // Machine status (lower priority)
+    refreshMachines();
+
+  } catch (e) {
+    document.getElementById('connection-status').textContent = 'Disconnected';
+    console.error('Refresh error:', e);
+  }
+}
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+initCharts();
+refresh();
+setInterval(refresh, REFRESH_MS);
+</script>
+</body>
+</html>

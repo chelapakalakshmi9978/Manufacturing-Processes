@@ -1,0 +1,11 @@
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.0.167:5000
+Press CTRL+C to quit
+Failure during generate. (POST https://us-south.ml.cloud.ibm.com/ml/v1/text/generation?version=2026-09-25)
+Status code: 429, body: {"errors":[{"code":"consumption_limit_reached","message":"The usage limit for the current plan has been reached: the total number of free concurrent requests for model ibm/granite-4-h-small has reached its limit 10. Please try again later","more_info":"https://cloud.ibm.com/apidocs/watsonx-ai#text-generation"}],"trace":"284263f236cf2c4a607bfd46c2e22de5","status_code":429}
+Failure during generate. (POST https://us-south.ml.cloud.ibm.com/ml/v1/text/generation?version=2026-09-25)
+Status code: 429, body: {"errors":[{"code":"consumption_limit_reached","message":"The usage limit for the current plan has been reached: the total number of free concurrent requests for model ibm/granite-4-h-small has reached its limit 10. Please try again later","more_info":"https://cloud.ibm.com/apidocs/watsonx-ai#text-generation"}],"trace":"88d7b3c86701bd6dc5125d4ab7c1b401","status_code":429}
+Failure during generate. (POST https://us-south.ml.cloud.ibm.com/ml/v1/text/generation?version=2026-09-25)
+Status code: 429, body: {"errors":[{"code":"consumption_limit_reached","message":"The usage limit for the current plan has been reached: the total number of free concurrent requests for model ibm/granite-4-h-small has reached its limit 10. Please try again later","more_info":"https://cloud.ibm.com/apidocs/watsonx-ai#text-generation"}],"trace":"aba97e255e786eccd8819d154876ec0a","status_code":429}
